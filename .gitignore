@@ -1,0 +1,27 @@
+﻿# Node / Electron
+node_modules/
+dist/
+out/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+backend/.venv/
+
+# Secrets / local config
+.env
+.env.local
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+*.exe
+*.dmg
+*.AppImage
