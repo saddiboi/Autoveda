@@ -22,8 +22,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from execution.runner import get_run_log, run_step, run_steps
+from execution import actions
+from execution.runner import get_run_log, run_step
 from perception.windows import WindowBackendUnavailable, list_windows, window_status
+from safety.controller import controller
 from storage import (
     load_scan_target,
     load_steps,
@@ -155,9 +157,21 @@ class RunStepIn(BaseModel):
     step: Step
 
 
-class RunStepsIn(BaseModel):
+class RunStartIn(BaseModel):
     steps: list[Step]
-    pre_delay: float = 0.0
+
+
+class DecisionIn(BaseModel):
+    decision: Literal["act", "skip", "stop"]
+
+
+class PanicIn(BaseModel):
+    reason: str = "user"
+
+
+class SafetySettingsIn(BaseModel):
+    confidence_threshold: Optional[float] = None
+    preview_mode: Optional[bool] = None
 
 
 @app.get("/steps")
@@ -172,17 +186,52 @@ def put_steps(body: StepsIn) -> dict:
 
 @app.post("/run/step")
 def post_run_step(body: RunStepIn) -> dict:
+    # Single-step quick test. Clear any prior halt; the action still obeys the
+    # corner failsafe and a concurrent panic (which re-sets the halt).
+    actions.clear_halt()
     return {"result": run_step(body.step.model_dump())}
 
 
-@app.post("/run/steps")
-def post_run_steps(body: RunStepsIn) -> dict:
-    return run_steps([s.model_dump() for s in body.steps], pre_delay=body.pre_delay)
+@app.post("/run/start")
+def post_run_start(body: RunStartIn) -> dict:
+    """Start a safety-gated, interruptible run on the controller's worker thread."""
+    return controller.start([s.model_dump() for s in body.steps])
+
+
+@app.get("/run/state")
+def get_run_state() -> dict:
+    return controller.state()
+
+
+@app.post("/run/decide")
+def post_run_decide(body: DecisionIn) -> dict:
+    return controller.decide(body.decision)
 
 
 @app.get("/run/log")
 def get_log() -> dict:
     return {"log": get_run_log()}
+
+
+# --- M3: safety controls ---------------------------------------------------------
+
+
+@app.post("/safety/panic")
+def post_panic(body: PanicIn | None = None) -> dict:
+    """Instant halt of all mouse/keyboard control. Hit by the global hotkey,
+    the STOP button, and the corner failsafe path."""
+    reason = body.reason if body else "user"
+    return controller.panic(reason)
+
+
+@app.get("/safety/settings")
+def get_safety_settings() -> dict:
+    return {"settings": controller.get_settings()}
+
+
+@app.put("/safety/settings")
+def put_safety_settings(body: SafetySettingsIn) -> dict:
+    return {"settings": controller.update_settings(body.model_dump(exclude_none=True))}
 
 
 def _can_bind(port: int) -> bool:

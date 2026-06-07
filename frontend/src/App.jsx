@@ -224,8 +224,10 @@ export default function App() {
           <ScanTarget baseUrl={baseUrl} inElectron={inElectron} />
         )}
 
-        {/* M2 — step editor + see-and-act run loop */}
-        {phase === PHASE.ONLINE && baseUrl && <StepEditor baseUrl={baseUrl} />}
+        {/* M2 — step editor + see-and-act run loop (M3 safety controls inside) */}
+        {phase === PHASE.ONLINE && baseUrl && (
+          <StepEditor baseUrl={baseUrl} inElectron={inElectron} />
+        )}
 
         <footer className="mt-auto pt-8 text-center text-xs text-slate-600">
           Local-first · backend on 127.0.0.1 · no automation features yet

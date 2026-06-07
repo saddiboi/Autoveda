@@ -20,4 +20,8 @@ contextBridge.exposeInMainWorld('autoveda', {
 
   // Opens the rectangle overlay; resolves to a physical-pixel region or null if cancelled.
   selectRegion: () => ipcRenderer.invoke('autoveda:selectRegion'),
+
+  // Panic stop — same path as the global hotkey (notifies UI + halts the backend).
+  panic: (reason) => ipcRenderer.invoke('autoveda:panic', reason),
+  onPanic: (cb) => ipcRenderer.on('autoveda:panic', (_e, info) => cb(info)),
 });

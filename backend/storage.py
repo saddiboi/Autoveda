@@ -16,6 +16,9 @@ DATA_DIR = os.environ.get("AUTOVEDA_DATA_DIR") or os.path.join(
 )
 SCAN_TARGET_FILE = os.path.join(DATA_DIR, "scan_target.json")
 STEPS_FILE = os.path.join(DATA_DIR, "steps.json")
+SAFETY_FILE = os.path.join(DATA_DIR, "safety.json")
+
+DEFAULT_SAFETY = {"confidence_threshold": 0.7, "preview_mode": False}
 
 
 def _atomic_write(path: str, data: dict) -> None:
@@ -53,3 +56,30 @@ def load_steps() -> list:
 def save_steps(steps: list) -> list:
     _atomic_write(STEPS_FILE, list(steps))
     return list(steps)
+
+
+def load_safety_settings() -> dict:
+    settings = dict(DEFAULT_SAFETY)
+    try:
+        with open(SAFETY_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            settings.update({k: data[k] for k in DEFAULT_SAFETY if k in data})
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    return settings
+
+
+def save_safety_settings(patch: dict) -> dict:
+    settings = load_safety_settings()
+    for key in DEFAULT_SAFETY:
+        if key in patch and patch[key] is not None:
+            settings[key] = patch[key]
+    # clamp threshold into [0, 1]
+    try:
+        settings["confidence_threshold"] = max(0.0, min(1.0, float(settings["confidence_threshold"])))
+    except (TypeError, ValueError):
+        settings["confidence_threshold"] = DEFAULT_SAFETY["confidence_threshold"]
+    settings["preview_mode"] = bool(settings["preview_mode"])
+    _atomic_write(SAFETY_FILE, settings)
+    return settings

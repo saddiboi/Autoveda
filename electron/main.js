@@ -4,10 +4,21 @@
 // Responsibilities: spawn the Python backend, perform the port handshake, host the
 // React UI window, and keep a system-tray presence. No automation features yet.
 
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  nativeImage,
+  ipcMain,
+  shell,
+  globalShortcut,
+} = require('electron');
 const path = require('path');
 const { startBackend, stopBackend } = require('./backend');
 const { selectRegion } = require('./overlay');
+
+const PANIC_ACCELERATOR = 'CommandOrControl+Shift+Space';
 
 const isDev = !app.isPackaged;
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
@@ -86,6 +97,7 @@ function createTray() {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: 'Show Autoveda', click: () => showMainWindow() },
+      { label: 'Panic stop (Ctrl+Shift+Space)', click: () => triggerPanic('tray') },
       { type: 'separator' },
       {
         label: 'Quit Autoveda',
@@ -99,6 +111,33 @@ function createTray() {
   tray.on('click', () => showMainWindow());
 }
 
+// --- Panic stop: global hotkey + STOP button both route here ---
+// Fires regardless of focus. Tells the backend to halt input *now* and notifies
+// the UI immediately so it reflects the stop without waiting for the next poll.
+async function triggerPanic(reason = 'hotkey') {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('autoveda:panic', { reason });
+  }
+  if (!backendInfo || !backendInfo.baseUrl) return { ok: false, error: 'backend not ready' };
+  try {
+    const res = await fetch(`${backendInfo.baseUrl}/safety/panic`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('[panic] backend POST failed:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+function registerPanicHotkey() {
+  const ok = globalShortcut.register(PANIC_ACCELERATOR, () => triggerPanic('hotkey'));
+  if (!ok) console.error('[panic] failed to register global hotkey', PANIC_ACCELERATOR);
+  else console.log('[panic] global hotkey registered:', PANIC_ACCELERATOR);
+}
+
 // --- IPC: expose backend handshake state to the renderer ---
 ipcMain.handle('autoveda:getBackendInfo', () => {
   if (backendInfo) return { ok: true, ...backendInfo };
@@ -106,6 +145,7 @@ ipcMain.handle('autoveda:getBackendInfo', () => {
   return { ok: false, pending: true };
 });
 ipcMain.handle('autoveda:appVersion', () => app.getVersion());
+ipcMain.handle('autoveda:panic', (_e, reason) => triggerPanic(reason || 'stop-button'));
 
 // Region picker: hide our window so the overlay can cover the screen, draw, restore.
 ipcMain.handle('autoveda:selectRegion', async () => {
@@ -126,6 +166,7 @@ ipcMain.handle('autoveda:selectRegion', async () => {
 app.whenReady().then(async () => {
   createTray();
   createWindow();
+  registerPanicHotkey();
 
   try {
     backendInfo = await startBackend();
@@ -150,4 +191,8 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   app.isQuitting = true;
   stopBackend();
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
