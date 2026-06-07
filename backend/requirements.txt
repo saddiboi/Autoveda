@@ -1,6 +1,16 @@
-# Autoveda backend — M0 (skeleton + health handshake)
+# Autoveda backend — M0 (skeleton + health handshake), M1 (scan modes)
 fastapi>=0.115,<0.117
 uvicorn[standard]>=0.30,<0.35
+
+# M1: open-window enumeration (Window scan mode). Best support on Windows.
+PyGetWindow>=0.0.9
+
+# M2: see-and-act core (capture, OCR, accessibility, input)
+mss>=9.0           # screenshots
+pyautogui>=0.9.54  # mouse + keyboard
+pytesseract>=0.3.10  # OCR fallback (needs Tesseract binary at OS level)
+Pillow>=10.0       # image handling for OCR
+uiautomation>=2.0  # accessibility tree (Windows UI Automation)
 
 # Packaging the backend into a standalone executable (M0 "installable" path).
 # Only needed when building installers; not required for the dev run.

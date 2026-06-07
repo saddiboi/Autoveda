@@ -17,4 +17,7 @@ contextBridge.exposeInMainWorld('autoveda', {
     ipcRenderer.on('autoveda:backendError', (_e, err) => cb(err)),
 
   appVersion: () => ipcRenderer.invoke('autoveda:appVersion'),
+
+  // Opens the rectangle overlay; resolves to a physical-pixel region or null if cancelled.
+  selectRegion: () => ipcRenderer.invoke('autoveda:selectRegion'),
 });

@@ -31,3 +31,6 @@ backend/build/
 
 # Backend handshake file (written at runtime into userData; ignored if it lands here)
 autoveda-port.json
+
+# Local backend data store (used when run standalone, outside Electron)
+backend/.data/

@@ -20,6 +20,13 @@ a = Analysis(
         "uvicorn.protocols.http.h11_impl",
         "uvicorn.protocols.websockets.auto",
         "uvicorn.lifespan.on",
+        # M2 perception/execution
+        "pyautogui",
+        "mss",
+        "pytesseract",
+        "PIL",
+        "uiautomation",
+        "comtypes",
     ],
     hookspath=[],
     runtime_hooks=[],

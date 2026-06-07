@@ -12,6 +12,11 @@ for the full product spec and architecture.
 - **Node.js** 18+ and npm
 - **Python** 3.10+ on `PATH` as `python` (Windows) / `python3` (macOS/Linux)
   - If your interpreter is named differently, set `AUTOVEDA_PYTHON` to its path.
+- **Tesseract OCR** (optional, for the OCR fallback in M2) installed at OS level.
+  The accessibility-tree path works without it; OCR only kicks in when accessibility
+  finds nothing. Install on Windows with `winget install UB-Mannheim.TesseractOCR`,
+  then set `TESSERACT_CMD` to `tesseract.exe` if it isn't on `PATH` (the default
+  install path is auto-detected).
 
 ## Install
 

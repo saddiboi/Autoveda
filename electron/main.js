@@ -7,6 +7,7 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell } = require('electron');
 const path = require('path');
 const { startBackend, stopBackend } = require('./backend');
+const { selectRegion } = require('./overlay');
 
 const isDev = !app.isPackaged;
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
@@ -105,6 +106,22 @@ ipcMain.handle('autoveda:getBackendInfo', () => {
   return { ok: false, pending: true };
 });
 ipcMain.handle('autoveda:appVersion', () => app.getVersion());
+
+// Region picker: hide our window so the overlay can cover the screen, draw, restore.
+ipcMain.handle('autoveda:selectRegion', async () => {
+  const wasVisible = mainWindow && mainWindow.isVisible();
+  if (wasVisible) mainWindow.hide();
+  // Give the OS a beat to actually hide the window before the overlay appears.
+  await new Promise((r) => setTimeout(r, 180));
+  try {
+    return await selectRegion();
+  } finally {
+    if (wasVisible && mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }
+});
 
 app.whenReady().then(async () => {
   createTray();

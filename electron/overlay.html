@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        cursor: crosshair;
+        user-select: none;
+        background: rgba(8, 12, 28, 0.28);
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      }
+      #hint {
+        position: fixed;
+        top: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(15, 20, 40, 0.88);
+        color: #e2e8f0;
+        padding: 8px 16px;
+        border-radius: 9px;
+        font-size: 13px;
+        pointer-events: none;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+      }
+      #sel {
+        position: fixed;
+        display: none;
+        border: 2px solid #818cf8;
+        background: rgba(129, 140, 248, 0.14);
+        box-shadow: 0 0 0 9999px rgba(5, 8, 20, 0.28);
+      }
+      #size {
+        position: absolute;
+        bottom: -24px;
+        left: 0;
+        color: #c7d2fe;
+        font-size: 12px;
+        background: rgba(15, 20, 40, 0.9);
+        padding: 1px 7px;
+        border-radius: 5px;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="hint">Drag to select a region&nbsp;·&nbsp;Esc to cancel</div>
+    <div id="sel"><div id="size"></div></div>
+    <script>
+      const sel = document.getElementById('sel');
+      const size = document.getElementById('size');
+      let sx = 0,
+        sy = 0,
+        drawing = false;
+
+      function rectOf(ax, ay, bx, by) {
+        return {
+          x: Math.min(ax, bx),
+          y: Math.min(ay, by),
+          width: Math.abs(ax - bx),
+          height: Math.abs(ay - by),
+        };
+      }
+      function apply(r) {
+        sel.style.left = r.x + 'px';
+        sel.style.top = r.y + 'px';
+        sel.style.width = r.width + 'px';
+        sel.style.height = r.height + 'px';
+        size.textContent = Math.round(r.width) + ' × ' + Math.round(r.height);
+      }
+
+      window.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        drawing = true;
+        sx = e.clientX;
+        sy = e.clientY;
+        apply(rectOf(sx, sy, sx, sy));
+        sel.style.display = 'block';
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!drawing) return;
+        apply(rectOf(sx, sy, e.clientX, e.clientY));
+      });
+      window.addEventListener('mouseup', (e) => {
+        if (!drawing) return;
+        drawing = false;
+        window.overlayApi.submit(rectOf(sx, sy, e.clientX, e.clientY));
+      });
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') window.overlayApi.cancel();
+      });
+    </script>
+  </body>
+</html>

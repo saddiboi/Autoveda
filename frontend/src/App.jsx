@@ -1,4 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import ScanTarget from './ScanTarget.jsx';
+import StepEditor from './StepEditor.jsx';
 
 // M0 UI: confirm the frontend <-> backend handshake is alive.
 // Flow: ask Electron for the negotiated backend URL (port handshake), then poll
@@ -216,6 +218,14 @@ export default function App() {
             <Check done={phase === PHASE.ONLINE}>/health reachable from the UI</Check>
           </ul>
         </section>
+
+        {/* M1 — scan target selection (shown once the backend is reachable) */}
+        {phase === PHASE.ONLINE && baseUrl && (
+          <ScanTarget baseUrl={baseUrl} inElectron={inElectron} />
+        )}
+
+        {/* M2 — step editor + see-and-act run loop */}
+        {phase === PHASE.ONLINE && baseUrl && <StepEditor baseUrl={baseUrl} />}
 
         <footer className="mt-auto pt-8 text-center text-xs text-slate-600">
           Local-first · backend on 127.0.0.1 · no automation features yet

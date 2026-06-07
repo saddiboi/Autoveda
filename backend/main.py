@@ -12,12 +12,24 @@ from __future__ import annotations
 import json
 import os
 import socket
+import sys
 import time
 from contextlib import closing
+from typing import Literal, Optional
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from execution.runner import get_run_log, run_step, run_steps
+from perception.windows import WindowBackendUnavailable, list_windows, window_status
+from storage import (
+    load_scan_target,
+    load_steps,
+    save_scan_target,
+    save_steps,
+)
 
 VERSION = "0.1.0"
 HOST = "127.0.0.1"
@@ -48,6 +60,129 @@ def health() -> dict:
         "pid": os.getpid(),
         "uptime_seconds": round(time.time() - _START_TIME, 2),
     }
+
+
+# --- M1: scan modes (window / rectangle / full screen) ---------------------------
+
+
+class Region(BaseModel):
+    x: int
+    y: int
+    width: int
+    height: int
+    scaleFactor: Optional[float] = None
+    displayId: Optional[int] = None
+
+
+class WindowRef(BaseModel):
+    id: int
+    title: Optional[str] = None
+    bounds: Optional[dict] = None
+
+
+class ScanTargetIn(BaseModel):
+    mode: Literal["window", "rectangle", "fullscreen"]
+    window: Optional[WindowRef] = None
+    region: Optional[Region] = None
+
+
+def compute_status(target: Optional[dict]) -> dict:
+    """Live status of the saved target. Window mode pauses while minimized/missing."""
+    if not target:
+        return {"state": "none", "paused": False}
+    mode = target.get("mode")
+    if mode in ("rectangle", "fullscreen"):
+        return {"state": "ready", "paused": False}
+    if mode == "window":
+        win = target.get("window") or {}
+        try:
+            st = window_status(win.get("id"))
+        except WindowBackendUnavailable as exc:
+            return {"state": "unsupported", "paused": False, "detail": str(exc)}
+        if not st["present"]:
+            return {"state": "window-missing", "paused": True, "minimized": False}
+        if st["minimized"]:
+            return {"state": "paused", "paused": True, "minimized": True, "bounds": None}
+        return {"state": "ready", "paused": False, "minimized": False, "bounds": st["bounds"]}
+    return {"state": "none", "paused": False}
+
+
+@app.get("/scan/windows")
+def scan_windows() -> dict:
+    """List open, titled windows for the Window scan mode."""
+    try:
+        return {"windows": list_windows(), "platform": sys.platform}
+    except WindowBackendUnavailable as exc:
+        return {"windows": [], "platform": sys.platform, "error": str(exc)}
+
+
+@app.get("/scan/target")
+def get_target() -> dict:
+    target = load_scan_target()
+    return {"target": target, "status": compute_status(target)}
+
+
+@app.put("/scan/target")
+def put_target(body: ScanTargetIn) -> dict:
+    if body.mode == "window" and (body.window is None or body.window.id is None):
+        raise HTTPException(status_code=422, detail="window mode requires window.id")
+    if body.mode == "rectangle" and body.region is None:
+        raise HTTPException(status_code=422, detail="rectangle mode requires region")
+    saved = save_scan_target(body.model_dump(exclude_none=False))
+    return {"target": saved, "status": compute_status(saved)}
+
+
+@app.get("/scan/status")
+def scan_status() -> dict:
+    return {"status": compute_status(load_scan_target())}
+
+
+# --- M2: steps + see-and-act run loop --------------------------------------------
+
+
+class Step(BaseModel):
+    find: Optional[str] = None
+    type: str = "text"  # element-type hint (text/button/field); informational for now
+    action: Literal["click", "double_click", "type", "move"] = "click"
+    value: Optional[str] = None
+
+
+class StepsIn(BaseModel):
+    steps: list[Step]
+
+
+class RunStepIn(BaseModel):
+    step: Step
+
+
+class RunStepsIn(BaseModel):
+    steps: list[Step]
+    pre_delay: float = 0.0
+
+
+@app.get("/steps")
+def get_steps() -> dict:
+    return {"steps": load_steps()}
+
+
+@app.put("/steps")
+def put_steps(body: StepsIn) -> dict:
+    return {"steps": save_steps([s.model_dump() for s in body.steps])}
+
+
+@app.post("/run/step")
+def post_run_step(body: RunStepIn) -> dict:
+    return {"result": run_step(body.step.model_dump())}
+
+
+@app.post("/run/steps")
+def post_run_steps(body: RunStepsIn) -> dict:
+    return run_steps([s.model_dump() for s in body.steps], pre_delay=body.pre_delay)
+
+
+@app.get("/run/log")
+def get_log() -> dict:
+    return {"log": get_run_log()}
 
 
 def _can_bind(port: int) -> bool:

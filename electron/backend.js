@@ -51,6 +51,7 @@ function startBackend() {
     ...process.env,
     AUTOVEDA_PORT_FILE: pf,
     AUTOVEDA_PREFERRED_PORT: String(PREFERRED_PORT),
+    AUTOVEDA_DATA_DIR: app.getPath('userData'),
     PYTHONUNBUFFERED: '1',
   };
 
