@@ -1,0 +1,69 @@
+{
+  "name": "autoveda",
+  "version": "0.1.0",
+  "description": "Autoveda — visual desktop task automation for non-technical users.",
+  "author": "Autoveda",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "postinstall": "npm --prefix frontend install",
+    "gen:icons": "node scripts/gen-icon.js",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:electron": "wait-on tcp:127.0.0.1:5173 && electron .",
+    "dev": "concurrently -k -n FE,ELECTRON -c blue,magenta \"npm:dev:frontend\" \"npm:dev:electron\"",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "pyinstaller --clean --noconfirm --distpath backend/dist --workpath backend/build backend/autoveda_backend.spec",
+    "pack": "npm run gen:icons && npm run build:frontend && electron-builder",
+    "dist": "npm run gen:icons && npm run build:frontend && npm run build:backend && electron-builder"
+  },
+  "build": {
+    "appId": "com.autoveda.app",
+    "productName": "Autoveda",
+    "directories": {
+      "buildResources": "assets",
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/dist/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend/dist/autoveda-backend",
+        "to": "backend",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Autoveda"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "assets/icon.png",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "assets/icon.png",
+      "category": "Utility"
+    }
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "electron": "^33.3.0",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.1"
+  }
+}

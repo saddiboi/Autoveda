@@ -2,6 +2,20 @@
 
 Project context for Claude Code. Read this before making changes. Keep it updated as the architecture evolves.
 
+## Code navigation — use Graphify first
+
+Before answering architecture, debugging, or code-navigation questions, use Graphify first.
+
+Prefer reading:
+- `graphify-out/GRAPH_REPORT.md`
+- `graphify-out/graph.json`
+
+Only open source files after identifying the relevant files from Graphify. Avoid scanning the entire project unless explicitly requested.
+
+If new files or modules have been added since the last run, regenerate the graph with `graphify .` before proceeding.
+
+When making changes, do not rewrite unrelated files. Keep changes focused and explain what was changed.
+
 ## What Autoveda is
 
 Autoveda is a cross-platform desktop app that lets **non-technical users** automate repetitive tasks in **any** application by showing or describing what to do. It fills the gap when software lacks a needed feature or integration. It operates **visually, like a human** — it does not require the target app to expose an API. Execution runs **offline**; the cloud is used only for first-run planning and for recovering from unexpected situations.
@@ -79,11 +93,13 @@ Small, always-on-top, frameless, draggable widget in a screen corner. Shows: run
 - On app start, Electron spawns the Python FastAPI service on `localhost`.
 - Backend exposes `GET /health` returning status + version.
 - Frontend polls `/health` on launch and shows backend status in the UI; surface a clear error if the backend fails to start.
-- Document the chosen port here once decided: `PORT = <fill in>`.
+- **Port negotiation (chosen approach):** the backend tries a preferred port (`8756`) and, if taken, binds the next free port. It writes the **actual chosen port** to a small handshake file (e.g. `userData/autoveda-port.json`) that Electron reads before polling `/health`. This keeps startup robust on machines where the preferred port is occupied.
+  - `PREFERRED_PORT = 8756`
+  - `PORT_FILE = <userData>/autoveda-port.json` (written by backend on bind, read by Electron)
 
 ## Suggested folder structure
 
-```
+\`\`\`
 autoveda/
   electron/            # Electron main process, tray, window mgmt, packaging
   frontend/            # React + Tailwind UI
@@ -99,7 +115,7 @@ autoveda/
     safety/            # panic hotkey, failsafe, confidence, logging
   shared/              # shared types / contracts between FE and BE
   CLAUDE.md
-```
+\`\`\`
 
 (Adjust as needed, but keep perception / execution / safety / cloud as clear boundaries.)
 
@@ -120,19 +136,24 @@ Build one at a time and **stop after each** for testing. Do not move past M3 unt
 
 ## Commands
 
-Fill these in as the project takes shape:
-
-```
+\`\`\`
 # install
-# frontend: npm install
-# backend:  pip install -r backend/requirements.txt   (Tesseract installed at OS level)
+pip install -r backend/requirements.txt   # backend (Tesseract installed at OS level, later milestone)
+npm install                                # shell + frontend (postinstall installs frontend/)
+npm run gen:icons                          # (re)generate assets/icon.png + assets/tray.png
 
-# dev
-# (command to run Electron + backend together)
+# dev — runs Vite + Electron together; Electron auto-spawns the Python backend
+npm run dev
+# backend alone: python backend/main.py  -> http://127.0.0.1:8756/health
 
-# build/package
-# (electron-builder targets for win/mac/linux)
-```
+# build/package — installers in release/ (.exe NSIS / .dmg / .AppImage)
+npm run dist                               # bundles backend (PyInstaller) + electron-builder
+npm run pack                               # UI-only shell, skips backend bundling
+\`\`\`
+
+Notes:
+- Backend spawn uses \`python\` (Win) / \`python3\` (other). Override with \`AUTOVEDA_PYTHON\` if needed.
+- Frontend ↔ backend contract documented in \`shared/handshake.md\`.
 
 ## Conventions
 

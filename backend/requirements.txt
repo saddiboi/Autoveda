@@ -1,0 +1,7 @@
+# Autoveda backend — M0 (skeleton + health handshake)
+fastapi>=0.115,<0.117
+uvicorn[standard]>=0.30,<0.35
+
+# Packaging the backend into a standalone executable (M0 "installable" path).
+# Only needed when building installers; not required for the dev run.
+pyinstaller>=6.10 ; platform_system != ""
